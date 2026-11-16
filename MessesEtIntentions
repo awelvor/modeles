@@ -1,0 +1,238 @@
+{# Enoria peut transmettre les bornes au format français JJ/MM/AAAA. #}
+{% set dateDebutDocument = start %}
+{% set dateFinDocument = end %}
+{% if '/' in start %}
+    {% set partiesDateDebut = start|split('/') %}
+    {% if partiesDateDebut|length == 3 %}
+        {% set dateDebutDocument = partiesDateDebut[2] ~ '-' ~ partiesDateDebut[1] ~ '-' ~ partiesDateDebut[0] %}
+    {% endif %}
+{% endif %}
+{% if '/' in end %}
+    {% set partiesDateFin = end|split('/') %}
+    {% if partiesDateFin|length == 3 %}
+        {% set dateFinDocument = partiesDateFin[2] ~ '-' ~ partiesDateFin[1] ~ '-' ~ partiesDateFin[0] %}
+    {% endif %}
+{% endif %}
+
+<table cellspacing="0" style="width:100%; margin-bottom:0.4cm;">
+    <tr>
+        <td style="width:75%; vertical-align:middle;">
+            <h3 style="font-size:1em; margin:0;"><span style="font-size:2em;">MESSES</span><br/>
+                {{ dateDebutDocument|format_datetime('none','none',pattern='EEEE d MMMM')|capitalize|replace({'janvier': 'Janvier', 'février': 'Février', 'mars': 'Mars', 'avril': 'Avril', 'mai': 'Mai', 'juin': 'Juin', 'juillet': 'Juillet', 'août': 'Août', 'septembre': 'Septembre', 'octobre': 'Octobre', 'novembre': 'Novembre', 'décembre': 'Décembre'}) }} au {{ dateFinDocument|format_datetime('none','none',pattern='EEEE d MMMM Y')|capitalize|replace({'janvier': 'Janvier', 'février': 'Février', 'mars': 'Mars', 'avril': 'Avril', 'mai': 'Mai', 'juin': 'Juin', 'juillet': 'Juillet', 'août': 'Août', 'septembre': 'Septembre', 'octobre': 'Octobre', 'novembre': 'Novembre', 'décembre': 'Décembre'}) }}</h3>
+            {# Activation explicite : les chaînes "false", "0" ou une valeur inconnue ne doivent pas activer le sous-titre. #}
+            {% set afficherCelebrantsTitreActif = false %}
+            {% if options.affichercelebrantstitre is defined %}
+                {% set valeurOptionCelebrantsTitre = options.affichercelebrantstitre %}
+                {% if valeurOptionCelebrantsTitre is same as(true) or valeurOptionCelebrantsTitre is same as(1) or valeurOptionCelebrantsTitre is same as('1') or valeurOptionCelebrantsTitre is same as('true') or valeurOptionCelebrantsTitre is same as('on') %}
+                    {% set afficherCelebrantsTitreActif = true %}
+                {% endif %}
+            {% endif %}
+            {% if afficherCelebrantsTitreActif %}
+                    {% set nomsCelebrantsTitre = [] %}
+                    {% for messe in messes %}
+                        {% for cel in messe.celebrants|default([]) %}
+                            {% set nomCelebrantTitre = cel.personne.nomComplet|default('')|trim %}
+                            {% if nomCelebrantTitre != '' and nomCelebrantTitre not in nomsCelebrantsTitre %}
+                                {% set nomsCelebrantsTitre = nomsCelebrantsTitre|merge([nomCelebrantTitre]) %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                    {% if nomsCelebrantsTitre|length > 0 %}
+                        <div style="font-size:0.85em; font-weight:normal; margin-top:0.15cm;">Célébrant{% if nomsCelebrantsTitre|length > 1 %}s{% endif %} : {{ nomsCelebrantsTitre|join(' · ') }}</div>
+                    {% endif %}
+            {% endif %}
+        </td>
+        <td style="width:25%; text-align:right; vertical-align:middle;">
+            {% if app.user.entiteActive.logo %}
+                <img src="{{ (app.user.entiteActive.logo)|imagine_filter('logo') }}" style="width:auto; height:auto; max-width:150px; max-height:84px;"/>
+            {% endif %}
+        </td>
+    </tr>
+</table>
+
+{#******************** Permet d'ajouter les défunts de la semaine passée, ainsi que leur âge s'il est défini. ********************#}
+{% if (dateDebutDocument|format_datetime('none','none',pattern='EEEE') == "samedi") and (dateFinDocument|format_datetime('none','none',pattern='EEEE') == "dimanche") %}
+    {% set dominicale = true %}
+    {% if funerailles|length > 0 %}
+        <p style="font-size:0.81em;"><strong>Défunts de la semaine :</strong><br/></p>
+        {%for funeraille in funerailles %}
+            <p style="font-size:0.81em;">{{ funeraille.defunt.nomComplet }}{% if funeraille.defunt.age|transAge != null %} - {{ funeraille.defunt.age|transAge }}{% endif %}<br/></p>
+        {% endfor %}
+    {% else %}
+        <p style="font-size:0.81em;">Aucun défunt cette semaine.<br/></p>
+    {% endif %}
+{% endif %}
+{#****************************************#}
+
+<div class="masses-body">
+{% if messes %}
+    {% if lieux %}
+        {% for lieu in lieux %}
+            <h3 style="font-size:0.81em;">{{ lieu.nom }} - {{ lieu.lieu }}</h3>
+            {% set datejour = null %}
+            {% for messe in messes %}
+                
+                    {% if messe.reservationEglise.salle == lieu %}
+                    {% if datejour != messe.dateHeure|date('d-m-Y') %}
+                        {% if datejour != null %}</table></div>{% endif %}
+                        <div class="day-block">
+                        <table cellspacing="0" class="mass-list" style="font-size:0.81em;">
+                        <tr class="day-spacing"><td colspan="3" style="height:0.63cm; padding:0; font-size:0; line-height:0;">&#160;</td></tr>
+                        <tr class="day-heading">
+                            <td class="day-date"><span class="day-date-text">{{ messe.dateHeure|format_datetime('none','none',pattern='EEEE d MMMM')|capitalize }}</span></td>
+                            <td class="day-color">
+                                {% if messe.informationsLiturgiques.couleur is defined and messe.informationsLiturgiques.ligne1 is defined %}
+                                    {% set couleurLiturgique = messe.informationsLiturgiques.couleur|trim|lower %}
+                                    {% if couleurLiturgique == 'vert' %}
+                                        <span class="liturgical-dot" style="background-color:#008000;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'blanc' %}
+                                        <span class="liturgical-dot" style="background-color:#FFFFFF;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'rouge' %}
+                                        <span class="liturgical-dot" style="background-color:#CC0000;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'violet' %}
+                                        <span class="liturgical-dot" style="background-color:#800080;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'rose' %}
+                                        <span class="liturgical-dot" style="background-color:#E890A8;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'noir' %}
+                                        <span class="liturgical-dot" style="background-color:#000000;">&#160;</span>
+                                    {% else %}
+                                        {{ messe.informationsLiturgiques.couleur }} :
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="day-liturgy">
+                                {% if messe.informationsLiturgiques.ligne1 is defined %}
+                                    {% set texteLiturgique = messe.informationsLiturgiques.ligne1|split(',', 2) %}{% if texteLiturgique|length > 1 and texteLiturgique[0]|trim|lower in ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] %}{{ texteLiturgique[1]|trim }}{% else %}{{ messe.informationsLiturgiques.ligne1 }}{% endif %}
+                                {% endif %}
+                                {% if messe.informationsLiturgiques.ligne2 != '' %}
+                                    <i>ou</i> {{ messe.informationsLiturgiques.ligne2 }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td colspan="3" class="mass-cell">
+                            <div class="mass-details{% if messe.Informations or messe.intentions|length > 0 %} mass-details-with-content{% endif %}">
+                                <div class="mass-title">
+                                    <strong>{{ messe.dateHeure|date('H') }}h{{ messe.dateHeure|date('i') }}</strong>
+                                    <span class="mass-separator"> - </span>
+                                    {% if messe.reservationEglise.salle.nom is defined %}
+                                        <strong>{{ messe.reservationEglise.salle.nom }}</strong>
+                                    {% else %}
+                                        <strong>{{ messe.reservationEglise.salle }}</strong>
+                                    {% endif %}
+                                    {% if messe.reservationEglise.salle.lieu is defined %}
+                                        {% if messe.reservationEglise.salle.lieu %}
+                                            <span class="church-location"> | {{ messe.reservationEglise.salle.lieu }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                {% if messe.Informations %}<div class="mass-information">{{ messe.Informations }}</div>{% endif %}
+                                {% if messe.intentions|length > 0 %}
+                                    <table cellspacing="0" class="intentions">
+                                        {% for intention in messe.intentions %}
+                                            <tr>
+                                                <td class="intention-marker">{% if intention.pourVivant %}<span class="badge badge-primary">v</span>{% else %}<span class="badge badge-black">+</span>{% endif %}</td>
+                                                <td class="intention-text"><span class="intention-text-inner">{{ intention.intention }}</span></td>
+                                            </tr>
+                                        {% endfor %}
+                                    </table>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% set datejour = messe.dateHeure|date('d-m-Y') %}
+                    {% endif %}
+                
+            {% endfor %}
+            {% if datejour != null %}</table></div>{% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if not lieux %}
+            {% set datejour = null %}
+            {% for messe in messes %}
+                
+                    {% if datejour != messe.dateHeure|date('d-m-Y') %}
+                        {% if datejour != null %}</table></div>{% endif %}
+                        <div class="day-block">
+                        <table cellspacing="0" class="mass-list" style="font-size:0.81em;">
+                        <tr class="day-spacing"><td colspan="3" style="height:0.63cm; padding:0; font-size:0; line-height:0;">&#160;</td></tr>
+                        <tr class="day-heading">
+                            <td class="day-date"><span class="day-date-text">{{ messe.dateHeure|format_datetime('none','none',pattern='EEEE d MMMM')|capitalize }}</span></td>
+                            <td class="day-color">
+                                {% if messe.informationsLiturgiques.couleur is defined and messe.informationsLiturgiques.ligne1 is defined %}
+                                    {% set couleurLiturgique = messe.informationsLiturgiques.couleur|trim|lower %}
+                                    {% if couleurLiturgique == 'vert' %}
+                                        <span class="liturgical-dot" style="background-color:#008000;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'blanc' %}
+                                        <span class="liturgical-dot" style="background-color:#FFFFFF;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'rouge' %}
+                                        <span class="liturgical-dot" style="background-color:#CC0000;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'violet' %}
+                                        <span class="liturgical-dot" style="background-color:#800080;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'rose' %}
+                                        <span class="liturgical-dot" style="background-color:#E890A8;">&#160;</span>
+                                    {% elseif couleurLiturgique == 'noir' %}
+                                        <span class="liturgical-dot" style="background-color:#000000;">&#160;</span>
+                                    {% else %}
+                                        {{ messe.informationsLiturgiques.couleur }} :
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="day-liturgy">
+                                {% if messe.informationsLiturgiques.ligne1 is defined %}
+                                    {% set texteLiturgique = messe.informationsLiturgiques.ligne1|split(',', 2) %}{% if texteLiturgique|length > 1 and texteLiturgique[0]|trim|lower in ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] %}{{ texteLiturgique[1]|trim }}{% else %}{{ messe.informationsLiturgiques.ligne1 }}{% endif %}
+                                {% endif %}
+                                {% if messe.informationsLiturgiques.ligne2 != '' %}
+                                    <i>ou</i> {{ messe.informationsLiturgiques.ligne2 }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td colspan="3" class="mass-cell">
+                            <div class="mass-details{% if messe.Informations or messe.intentions|length > 0 %} mass-details-with-content{% endif %}">
+                                <div class="mass-title">
+                                    <strong>{{ messe.dateHeure|date('H') }}h{{ messe.dateHeure|date('i') }}</strong>
+                                    <span class="mass-separator"> - </span>
+                                    {% if messe.reservationEglise.salle.nom is defined %}
+                                        <strong>{{ messe.reservationEglise.salle.nom }}</strong>
+                                    {% else %}
+                                        <strong>{{ messe.reservationEglise.salle }}</strong>
+                                    {% endif %}
+                                    {% if messe.reservationEglise.salle.lieu is defined %}
+                                        {% if messe.reservationEglise.salle.lieu %}
+                                            <span class="church-location"> | {{ messe.reservationEglise.salle.lieu }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                {% if messe.Informations %}<div class="mass-information">{{ messe.Informations }}</div>{% endif %}
+                                {% if messe.intentions|length > 0 %}
+                                    <table cellspacing="0" class="intentions">
+                                        {% for intention in messe.intentions %}
+                                            <tr>
+                                                <td class="intention-marker">{% if intention.pourVivant %}<span class="badge badge-primary">v</span>{% else %}<span class="badge badge-black">+</span>{% endif %}</td>
+                                                <td class="intention-text"><span class="intention-text-inner">{{ intention.intention }}</span></td>
+                                            </tr>
+                                        {% endfor %}
+                                    </table>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% set datejour = messe.dateHeure|date('d-m-Y') %}
+                
+            {% endfor %}
+            {% if datejour != null %}</table></div>{% endif %}
+    {% endif %}
+
+
+{% else %}
+    Aucune messe n'a été trouvée
+{% endif %}
+</div>
+
+<div id="footer">
+    Liste des messes générée automatiquement par <i>Enoria</i> - {{ app.user.entiteActive }} le {{ 'now'|date('d/m/Y - H:i') }}
+</div>
